@@ -24,9 +24,16 @@ export function ContentSurface({
   children,
   unframed = false,
   terminal,
+  rightDock,
 }: {
   children: ReactNode;
   terminal?: ReactNode;
+  /**
+   * Docked panel rendered as a persistent right-side column beside the primary
+   * content. Owned by the right-dock store; nothing is rendered when the store
+   * reports it closed.
+   */
+  rightDock?: ReactNode;
   /** Used by dedicated huddle windows, which should not resemble app cards. */
   unframed?: boolean;
 }) {
@@ -40,8 +47,11 @@ export function ContentSurface({
       data-buzz-content-surface
       data-buzz-content-unframed={unframed ? true : undefined}
     >
-      <div className="buzz-content-primary flex min-h-0 flex-1 flex-col overflow-hidden">
-        {children}
+      <div className="buzz-content-body flex min-h-0 flex-1 flex-row overflow-hidden">
+        <div className="buzz-content-primary flex min-h-0 flex-1 flex-col overflow-hidden">
+          {children}
+        </div>
+        {rightDock}
       </div>
       <div className="buzz-terminal-dock-host" data-terminal-dock>
         {terminal}

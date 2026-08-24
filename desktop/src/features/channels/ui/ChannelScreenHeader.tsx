@@ -1,4 +1,4 @@
-import { LogIn, SquareTerminal } from "lucide-react";
+import { LogIn, PanelRight, SquareTerminal } from "lucide-react";
 import type * as React from "react";
 
 import { ChatHeader } from "@/features/chat/ui/ChatHeader";
@@ -21,6 +21,10 @@ import {
   toggleTerminalPanel,
   useTerminalPanel,
 } from "@/features/terminal/terminalPanelStore";
+import {
+  toggleRightDock,
+  useRightDock,
+} from "@/features/right-dock/rightDockStore";
 
 const DM_HEADER_AVATAR_SIZE = 32;
 const DM_HEADER_AVATAR_STATUS_GEOMETRY = scaleProfileAvatarStatusGeometry(
@@ -93,6 +97,20 @@ export function ChannelScreenHeader({
       <SquareTerminal />
     </Button>
   ) : null;
+  const rightDock = useRightDock();
+  const benchButton = activeChannel ? (
+    <Button
+      aria-label={rightDock.open ? "Close right dock" : "Open right dock"}
+      aria-pressed={rightDock.open}
+      onClick={() => toggleRightDock()}
+      size="icon"
+      title="Bench panel"
+      type="button"
+      variant={rightDock.open ? "secondary" : "outline"}
+    >
+      <PanelRight />
+    </Button>
+  ) : null;
   const channelActions = activeChannel ? (
     showJoinButton ? (
       <Button
@@ -118,6 +136,7 @@ export function ChannelScreenHeader({
   ) : null;
   const actions = activeChannel ? (
     <div className="flex items-center gap-1">
+      {benchButton}
       {terminalButton}
       {channelActions}
     </div>

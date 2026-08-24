@@ -6,6 +6,7 @@ import { useTerminalContext } from "@/app/useTerminalContext";
 import { AppShellProvider } from "@/app/AppShellContext";
 import { AppShellOverlays, TerminalBootstrap } from "@/app/AppShellOverlays";
 import { AppShellChannelSurface } from "@/app/AppShellChannelSurface";
+import { RightDock } from "@/features/right-dock/RightDock";
 import { AppHuddleShell } from "@/app/AppHuddleShell";
 import { AppTopChrome } from "@/app/AppTopChrome";
 import {
@@ -928,6 +929,7 @@ export function AppShell() {
                           isHuddleRoom={isHuddleRoom}
                           isHuddleRoomStarting={isHuddleRoomStarting}
                           mainInsetRef={mainInsetRef}
+                          rightDock={<RightDock />}
                           terminal={
                             <TerminalBootstrap {...effectiveTerminalContext} />
                           }
