@@ -121,6 +121,14 @@ pub(crate) fn find_local_repo_dir(
     project_dtag: &str,
     clone_url: Option<&str>,
 ) -> Result<Option<std::path::PathBuf>, String> {
+    // A folder the user picked explicitly wins over the by-name scan below,
+    // and is checked first so a linked repository resolves even when no repos
+    // root exists yet — the scan errors on an inaccessible root, which on a
+    // fresh machine is every root.
+    if let Some(linked) = super::project_local_links::linked_checkout_dir(project_dtag, clone_url) {
+        return Ok(Some(linked));
+    }
+
     let repos_roots = canonical_repos_roots(repos_dir)?;
 
     for repos_root in repos_roots {

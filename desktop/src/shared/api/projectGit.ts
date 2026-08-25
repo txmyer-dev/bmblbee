@@ -699,3 +699,70 @@ export async function publishProjectPullRequestMergedStatus(input: {
     input,
   });
 }
+
+/** A repository bound to a folder the user picked on this machine. */
+export type ProjectLocalCheckout = {
+  dtag: string;
+  path: string;
+  cloneUrl?: string;
+};
+
+/**
+ * Open the OS folder picker. Resolves to `null` when the user cancels, so
+ * callers can distinguish "chose nothing" from a dialog that failed to open.
+ */
+export async function pickDirectory(title?: string): Promise<string | null> {
+  return (
+    (await invokeTauri<string | null>("pick_directory", {
+      title: title ?? null,
+    })) ?? null
+  );
+}
+
+/**
+ * Bind a repository to an existing checkout on this machine, so the project
+ * surfaces read it instead of looking for a Buzz-made clone under the repos
+ * root. Rejects a folder that is not a git repository.
+ */
+export async function linkProjectLocalCheckout(input: {
+  projectDtag: string;
+  cloneUrl?: string | null;
+  path: string;
+}): Promise<ProjectLocalCheckout> {
+  return invokeTauri<ProjectLocalCheckout>("link_project_local_checkout", {
+    projectDtag: input.projectDtag,
+    cloneUrl: input.cloneUrl ?? null,
+    path: input.path,
+  });
+}
+
+/** Drop a repository's link. The folder itself is left alone. */
+export async function unlinkProjectLocalCheckout(
+  projectDtag: string,
+): Promise<void> {
+  await invokeTauri<void>("unlink_project_local_checkout", { projectDtag });
+}
+
+/** Every recorded link, including ones whose folder has since moved away. */
+export async function listProjectLocalCheckouts(): Promise<
+  ProjectLocalCheckout[]
+> {
+  return invokeTauri<ProjectLocalCheckout[]>("list_project_local_checkouts");
+}
+
+/** A folder on this machine, described well enough to prefill a new project. */
+export type LocalRepositoryInfo = {
+  path: string;
+  name: string;
+  originUrl: string | null;
+};
+
+/**
+ * Read a picked folder's directory name and `origin` remote. Parses the git
+ * config directly, so it still works when the git binary is missing.
+ */
+export async function inspectLocalRepository(
+  path: string,
+): Promise<LocalRepositoryInfo> {
+  return invokeTauri<LocalRepositoryInfo>("inspect_local_repository", { path });
+}

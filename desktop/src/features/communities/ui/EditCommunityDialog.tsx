@@ -1,3 +1,4 @@
+import { FolderOpen } from "lucide-react";
 import * as React from "react";
 
 import { CommunityIconSettingsCard } from "@/features/communities/ui/CommunityIconSettingsCard";
@@ -7,6 +8,7 @@ import {
   expandTilde,
   normalizeRelayUrl,
 } from "@/features/communities/communityStorage";
+import { pickDirectory } from "@/shared/api/projectGit";
 import { validateReposDir } from "@/shared/api/tauri";
 import { Button } from "@/shared/ui/button";
 import {
@@ -65,6 +67,23 @@ export function EditCommunityDialog({
   const handleClose = React.useCallback(() => {
     onOpenChange(false);
   }, [onOpenChange]);
+
+  /** Fill the field from the OS folder picker. Typing an absolute Windows
+   * path by hand was previously the only way to set this. */
+  const handleBrowseReposDir = React.useCallback(async () => {
+    try {
+      const picked = await pickDirectory("Choose your repositories folder");
+      if (picked === null) return;
+      setReposDir(picked);
+      setReposDirError(null);
+    } catch (error) {
+      setReposDirError(
+        error instanceof Error
+          ? error.message
+          : "Could not open the folder picker.",
+      );
+    }
+  }, []);
 
   const handleSubmit = React.useCallback(
     async (e: React.FormEvent) => {
@@ -205,16 +224,30 @@ export function EditCommunityDialog({
                 (optional)
               </span>
             </label>
-            <Input
-              id="edit-ws-repos-dir"
-              onChange={(e) => {
-                setReposDir(e.target.value);
-                setReposDirError(null);
-              }}
-              placeholder="~/Development"
-              type="text"
-              value={reposDir}
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                className="min-w-0 flex-1"
+                id="edit-ws-repos-dir"
+                onChange={(e) => {
+                  setReposDir(e.target.value);
+                  setReposDirError(null);
+                }}
+                placeholder="~/Development"
+                type="text"
+                value={reposDir}
+              />
+              <Button
+                className="shrink-0 gap-1.5"
+                onClick={() => {
+                  void handleBrowseReposDir();
+                }}
+                type="button"
+                variant="outline"
+              >
+                <FolderOpen className="h-4 w-4" />
+                Browse…
+              </Button>
+            </div>
             {reposDirError ? (
               <p className="text-xs text-destructive">{reposDirError}</p>
             ) : null}

@@ -19,6 +19,10 @@ import {
   usePushProjectLocalRepositoryMutation,
 } from "@/features/projects/repoSyncHooks";
 import { useProjectBranchActions } from "@/features/projects/branchMutations";
+import {
+  useProjectLocalCheckoutLink,
+  useProjectLocalCheckoutsQuery,
+} from "@/features/projects/useProjectLocalCheckoutLink";
 import { useOptimisticProjectBranches } from "@/features/projects/useOptimisticProjectBranches";
 import { useProjectRepositoryRefSelection } from "@/features/projects/useProjectRepositoryRefSelection";
 import { useUpdateProjectPullRequestMutation } from "@/features/projects/pullRequestMutations";
@@ -253,6 +257,14 @@ export function ProjectDetailScreen(props: ProjectDetailScreenProps) {
     repository,
     activeCommunity?.reposDir,
   );
+  const localCheckoutLink = useProjectLocalCheckoutLink(repository ?? null);
+  const localCheckoutsQuery = useProjectLocalCheckoutsQuery();
+  const hasLinkedCheckout = Boolean(
+    repository &&
+      (localCheckoutsQuery.data ?? []).some(
+        (checkout) => checkout.dtag === repository.dtag,
+      ),
+  );
   const createIssueMutation = useCreateProjectIssueMutation(repository);
   const updatePullRequestMutation = useUpdateProjectPullRequestMutation(
     repository,
@@ -391,6 +403,19 @@ export function ProjectDetailScreen(props: ProjectDetailScreenProps) {
           }
         : undefined,
     clonePending: cloneRepoMutation.isPending,
+    onLinkLocal:
+      !selectedTag && repository
+        ? () => {
+            void localCheckoutLink.link();
+          }
+        : undefined,
+    linkPending: localCheckoutLink.linkPending,
+    onUnlinkLocal:
+      !selectedTag && hasLinkedCheckout
+        ? () => {
+            void localCheckoutLink.unlink();
+          }
+        : undefined,
     canPush: !selectedTag && (repoSyncStatusQuery.data?.canPush ?? false),
     onPush: selectedTag
       ? undefined

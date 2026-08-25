@@ -6,6 +6,7 @@ import {
   GitBranch,
   Globe,
   HardDrive,
+  FolderSearch,
   Loader2,
   Plus,
   RefreshCw,
@@ -193,6 +194,12 @@ export type RepoSourceHeaderControls = {
   /** Clones the repository when no local checkout is available. */
   onCloneLocal?: () => void;
   clonePending?: boolean;
+  /** Binds an existing checkout already on this machine, for developers who
+   * cloned the repository themselves before Buzz ever saw it. */
+  onLinkLocal?: () => void;
+  linkPending?: boolean;
+  /** Drops that binding, returning the repository to the repos-root lookup. */
+  onUnlinkLocal?: () => void;
   /** Push of local commits, available when the local checkout is ahead. */
   canPush?: boolean;
   onPush?: () => void;
@@ -304,6 +311,34 @@ export function RepoSourceDropdown({
             <span className="ml-auto rounded-md border border-input/60 bg-background px-2 py-0.5 text-xs font-medium text-foreground shadow-xs group-focus:border-input">
               {controls.clonePending ? "Cloning…" : "Clone"}
             </span>
+          </DropdownMenuItem>
+        ) : null}
+        {controls.onLinkLocal ? (
+          <>
+            {cloneLocal ? null : <DropdownMenuSeparator />}
+            <DropdownMenuItem
+              data-testid="project-link-local-checkout"
+              disabled={controls.linkPending}
+              onSelect={controls.onLinkLocal}
+            >
+              {controls.linkPending ? (
+                <Loader2 className="animate-spin text-muted-foreground" />
+              ) : (
+                <FolderSearch className="text-muted-foreground" />
+              )}
+              {isLocal
+                ? "Choose a different folder…"
+                : "Locate on this computer…"}
+            </DropdownMenuItem>
+          </>
+        ) : null}
+        {controls.onUnlinkLocal ? (
+          <DropdownMenuItem
+            data-testid="project-unlink-local-checkout"
+            onSelect={controls.onUnlinkLocal}
+          >
+            <Trash2 className="text-muted-foreground" />
+            Forget this folder
           </DropdownMenuItem>
         ) : null}
       </DropdownMenuContent>

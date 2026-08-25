@@ -1,8 +1,9 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FolderSearch, X } from "lucide-react";
 import * as React from "react";
 
 import { useChannelsQuery } from "@/features/channels/hooks";
 import type { CreateProjectInput } from "@/features/projects/useCreateProject";
+import { inspectLocalRepository, pickDirectory } from "@/shared/api/projectGit";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/ui/button";
 import { ChooserDialogContent } from "@/shared/ui/chooser-dialog-content";
@@ -36,6 +37,8 @@ export function CreateProjectFormContent({
   const [cloneUrl, setCloneUrl] = React.useState("");
   const [webUrl, setWebUrl] = React.useState("");
   const [accessChannelId, setAccessChannelId] = React.useState("");
+  const [localPath, setLocalPath] = React.useState("");
+  const [isBrowsing, setIsBrowsing] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const nameInputRef = React.useRef<HTMLInputElement>(null);
   const channelsQuery = useChannelsQuery({ enabled: active });
@@ -57,6 +60,8 @@ export function CreateProjectFormContent({
     setCloneUrl("");
     setWebUrl("");
     setAccessChannelId(accessChannels[0]?.id ?? "");
+    setLocalPath("");
+    setIsBrowsing(false);
     setErrorMessage(null);
 
     const timerId = globalThis.setTimeout(() => {
@@ -64,6 +69,35 @@ export function CreateProjectFormContent({
     }, 50);
     return () => globalThis.clearTimeout(timerId);
   }, [accessChannels, active, initialName]);
+
+  /**
+   * Pick an existing checkout and prefill from it. Name and clone URL are
+   * only filled when still blank, so a deliberate entry is never overwritten
+   * by a later browse.
+   */
+  async function handleBrowseLocalRepo() {
+    setIsBrowsing(true);
+    setErrorMessage(null);
+    try {
+      const picked = await pickDirectory("Locate your repository folder");
+      if (picked === null) return;
+      const info = await inspectLocalRepository(picked);
+      setLocalPath(info.path);
+      setName((current) => current.trim() || info.name);
+      const originUrl = info.originUrl;
+      if (originUrl) {
+        setCloneUrl((current) => current.trim() || originUrl);
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not read that folder as a git repository.",
+      );
+    } finally {
+      setIsBrowsing(false);
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,6 +112,7 @@ export function CreateProjectFormContent({
         description: description.trim() || undefined,
         cloneUrl: cloneUrl.trim() || undefined,
         webUrl: webUrl.trim() || undefined,
+        localPath: localPath.trim() || undefined,
       });
       onCreated();
     } catch (error) {
@@ -231,6 +266,62 @@ export function CreateProjectFormContent({
               value={description}
             />
           </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <span className="text-sm font-medium text-foreground">
+            Local folder
+            <span className={CREATE_LABEL_OPTIONAL_CLASS}>Optional</span>
+          </span>
+          <div className="flex items-center gap-2">
+            <div
+              className={cn(
+                "flex min-h-11 min-w-0 flex-1 items-center px-3",
+                CREATE_FIELD_SHELL_CLASS,
+              )}
+            >
+              <span
+                className={cn(
+                  "min-w-0 flex-1 truncate text-sm",
+                  localPath ? "text-foreground" : "text-muted-foreground/55",
+                )}
+                data-testid="create-project-local-path"
+                title={localPath || undefined}
+              >
+                {localPath || "No folder chosen"}
+              </span>
+              {localPath ? (
+                <Button
+                  aria-label="Clear the chosen folder"
+                  className="ml-1 h-7 w-7 shrink-0 text-muted-foreground"
+                  disabled={isCreating}
+                  onClick={() => setLocalPath("")}
+                  size="icon"
+                  type="button"
+                  variant="ghost"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              ) : null}
+            </div>
+            <Button
+              className="shrink-0 gap-1.5"
+              data-testid="create-project-browse-local"
+              disabled={isCreating || isBrowsing}
+              onClick={() => {
+                void handleBrowseLocalRepo();
+              }}
+              type="button"
+              variant="outline"
+            >
+              <FolderSearch className="h-4 w-4" />
+              {isBrowsing ? "Opening…" : "Browse…"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Already have this repository checked out? Pick its folder and Buzz
+            will use it directly, filling in the name and clone URL from it.
+          </p>
         </div>
 
         <div className="space-y-1.5">

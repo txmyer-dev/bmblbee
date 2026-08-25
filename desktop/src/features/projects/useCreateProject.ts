@@ -12,6 +12,7 @@ import {
 } from "@/features/projects/projectCreation";
 import { addProjectToSidebar } from "@/features/projects/lib/projectSidebarMembership";
 import { buildProjectReadModels } from "@/features/projects/projectModels";
+import { linkProjectLocalCheckout } from "@/shared/api/projectGit";
 import { relayClient } from "@/shared/api/relayClient";
 import { getCachedRelayOrigin } from "@/shared/lib/mediaUrl";
 import { signRelayEvent } from "@/shared/api/tauri";
@@ -23,6 +24,8 @@ export type CreateProjectInput = {
   description?: string;
   cloneUrl?: string;
   webUrl?: string;
+  /** Existing checkout on this machine to bind the new repository to. */
+  localPath?: string;
 };
 
 export type CreateProjectResult = {
@@ -119,7 +122,36 @@ async function createProject(
     throw new Error("The project was created but could not be read.");
   }
   resumableProjectIds.delete(projectId);
+  await linkCreatedProjectCheckout(project, input.localPath);
   return { project };
+}
+
+/**
+ * Bind the folder the user picked in the create form to the repository that
+ * was just published, so the new project opens against their existing
+ * checkout instead of offering to clone one it already has.
+ *
+ * A failure here is reported but not thrown: the project itself was created
+ * successfully, and losing it to a link error would be far worse than the
+ * user re-linking from the repository's source menu.
+ */
+async function linkCreatedProjectCheckout(
+  project: Project,
+  localPath: string | undefined,
+) {
+  const path = localPath?.trim();
+  if (!path) return;
+  const repository = project.repositories[0];
+  if (!repository) return;
+  try {
+    await linkProjectLocalCheckout({
+      projectDtag: repository.dtag,
+      cloneUrl: repository.cloneUrls[0] ?? null,
+      path,
+    });
+  } catch (error) {
+    console.warn("[useCreateProject] could not link local checkout:", error);
+  }
 }
 
 /** Mutation that creates a project and inserts it into the projects cache. */
