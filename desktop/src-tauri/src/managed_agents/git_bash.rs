@@ -336,6 +336,22 @@ fn is_under_dir(dir: &Path, root: &Path) -> bool {
 /// install-location fallback has been exhausted.
 #[cfg(windows)]
 fn git_bash_from_registry() -> Option<PathBuf> {
+    git_for_windows_roots_from_registry()
+        .into_iter()
+        .map(|root| root.join("bin").join("bash.exe"))
+        .find(|bash| bash.is_file())
+}
+
+/// Every Git for Windows install root recorded under
+/// `HKLM/HKCU\SOFTWARE\GitForWindows\InstallPath`, machine hive first.
+///
+/// Split out of [`git_bash_from_registry`] so `git.exe` resolution can reuse
+/// the same probe: an install made with the "Git from Git Bash only" PATH
+/// option writes this key but puts nothing on the process PATH, which is the
+/// exact case where `resolve_command("git")` would otherwise report git absent
+/// on a machine that has it (block/buzz — Windows clone failures).
+#[cfg(windows)]
+fn git_for_windows_roots_from_registry() -> Vec<PathBuf> {
     use std::ffi::OsString;
     use std::os::windows::ffi::OsStringExt;
     use windows_sys::Win32::Foundation::{ERROR_MORE_DATA, ERROR_SUCCESS};
@@ -348,6 +364,8 @@ fn git_bash_from_registry() -> Option<PathBuf> {
     const VALUE: &str = "InstallPath";
     let key: Vec<u16> = KEY.encode_utf16().chain(Some(0)).collect();
     let value: Vec<u16> = VALUE.encode_utf16().chain(Some(0)).collect();
+
+    let mut roots = Vec::new();
 
     // SAFETY: Inputs are null-terminated UTF-16 for the duration of each call,
     // and every successfully opened handle is closed before trying the next hive.
@@ -389,16 +407,14 @@ fn git_bash_from_registry() -> Option<PathBuf> {
             while data.last() == Some(&0) {
                 data.pop();
             }
-            let bash = PathBuf::from(OsString::from_wide(&data))
-                .join("bin")
-                .join("bash.exe");
-            if bash.is_file() {
-                return Some(bash);
+            let root = PathBuf::from(OsString::from_wide(&data));
+            if root.is_dir() && !roots.contains(&root) {
+                roots.push(root);
             }
         }
     }
 
-    None
+    roots
 }
 
 #[cfg(windows)]
@@ -414,6 +430,68 @@ fn git_bash_from_standard_paths(
     .flatten()
     .map(|install_root| install_root.join("bin").join("bash.exe"))
     .find(|bash| bash.is_file())
+}
+
+/// Resolve `git.exe` on Windows using the Git-for-Windows chain that already
+/// backs Git Bash discovery: PATH scan, then the standard install locations,
+/// then the `SOFTWARE\GitForWindows` registry key.
+///
+/// Exists because Git for Windows only puts git on the process PATH when the
+/// installer's "Git from the command line and also from 3rd-party software"
+/// option is chosen. With the Git-Bash-only option the binary is present and
+/// working, but invisible to a plain PATH lookup — so the project git commands
+/// reported "git was not found on PATH" on machines that clearly had git.
+///
+/// Returns `None` on every non-Windows platform, where the ordinary PATH and
+/// login-shell resolution in `discovery.rs` already covers this — callers use
+/// it as an `or_else` fallback on all platforms.
+pub(crate) fn resolve_git_for_windows() -> Option<std::path::PathBuf> {
+    #[cfg(windows)]
+    {
+        let path_env = std::env::var("PATH").unwrap_or_default();
+        return scan_path_for_command(Path::new("git.exe"), &path_env, None)
+            .filter(|git| !is_windows_apps_alias(git))
+            .or_else(|| {
+                git_for_windows_from_standard_paths([
+                    std::env::var_os("ProgramFiles").map(PathBuf::from),
+                    std::env::var_os("ProgramFiles(x86)").map(PathBuf::from),
+                    std::env::var_os("LOCALAPPDATA").map(PathBuf::from),
+                ])
+            })
+            .or_else(|| {
+                git_for_windows_roots_from_registry()
+                    .into_iter()
+                    .find_map(|root| git_exe_under_install_root(&root))
+            });
+    }
+
+    #[cfg(not(windows))]
+    None
+}
+
+/// `git.exe` inside a Git for Windows install root. `cmd\git.exe` is the
+/// wrapper the installer puts on PATH and is preferred; `bin\git.exe` is the
+/// MSYS build, correct but noisier about its environment.
+#[cfg(windows)]
+fn git_exe_under_install_root(install_root: &Path) -> Option<PathBuf> {
+    ["cmd", "bin", "mingw64/bin"]
+        .into_iter()
+        .map(|dir| install_root.join(dir).join("git.exe"))
+        .find(|git| git.is_file())
+}
+
+#[cfg(windows)]
+fn git_for_windows_from_standard_paths(
+    [program_files, program_files_x86, local_app_data]: [Option<PathBuf>; 3],
+) -> Option<PathBuf> {
+    [
+        program_files.map(|base| base.join("Git")),
+        program_files_x86.map(|base| base.join("Git")),
+        local_app_data.map(|base| base.join("Programs").join("Git")),
+    ]
+    .into_iter()
+    .flatten()
+    .find_map(|install_root| git_exe_under_install_root(&install_root))
 }
 
 #[cfg(all(test, windows))]

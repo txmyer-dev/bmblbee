@@ -33,6 +33,16 @@ export function projectCloneErrorPresentation(
         "You need access to the repository’s channel before you can clone it.",
     };
   }
+  // Surfaced by build_git_auth_config when resolve_command("git") comes up
+  // empty. Without this branch it fell through to the generic "try again"
+  // catch-all, which reads as a broken app rather than a missing dependency.
+  if (/git was not found on path/.test(message)) {
+    return {
+      title: "Git isn't installed",
+      description:
+        "Buzz runs the system git to clone and sync repositories. Install Git, then reopen Buzz so it can pick it up.",
+    };
+  }
   if (
     /\b(?:401|403)\b|authenticat|authoriz|permission denied|access denied|ssh certificate/.test(
       message,

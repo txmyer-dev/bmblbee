@@ -49,3 +49,12 @@ test("uses a concise fallback", () => {
       "Try again. If the problem continues, contact the repository owner.",
   });
 });
+
+test("names a missing git install instead of the generic retry advice", () => {
+  const presentation = projectCloneErrorPresentation(
+    new Error("git was not found on PATH"),
+    "https://github.com/block/buzz.git",
+  );
+  assert.equal(presentation.title, "Git isn't installed");
+  assert.match(presentation.description, /Install Git/);
+});

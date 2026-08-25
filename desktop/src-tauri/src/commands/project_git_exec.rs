@@ -198,6 +198,21 @@ fn apply_git_config(command: &mut Command, entries: &[(&str, String)]) {
     }
 }
 
+/// Locate the `git` binary for every project git command.
+///
+/// Falls back to the Git-for-Windows install-location and registry chain when
+/// the ordinary PATH resolution misses. Git for Windows only puts git on PATH
+/// when the installer's "Git from the command line and also from 3rd-party
+/// software" option is chosen; with the Git-Bash-only option git is installed
+/// and working but invisible to a PATH lookup, so clones failed with "git was
+/// not found on PATH" on machines that plainly had git. The fallback is inert
+/// on macOS and Linux, where PATH plus the login-shell probe already suffice.
+fn resolve_git_binary() -> Result<std::path::PathBuf, String> {
+    resolve_command("git")
+        .or_else(crate::managed_agents::git_bash::resolve_git_for_windows)
+        .ok_or_else(|| "git was not found on PATH".to_string())
+}
+
 pub(crate) fn build_git_auth_config(state: &AppState) -> Result<GitAuthConfig, String> {
     let keys = state.signing_keys()?;
     build_git_auth_config_for_keys(&keys)
@@ -209,8 +224,7 @@ pub(crate) fn build_git_clone_auth_config(
 ) -> Result<GitAuthConfig, String> {
     if validate_github_clone_url(clone_url).is_ok() {
         return Ok(GitAuthConfig {
-            git_path: resolve_command("git")
-                .ok_or_else(|| "git was not found on PATH".to_string())?,
+            git_path: resolve_git_binary()?,
             credential_helper: None,
             nsec: String::new(),
             allow_file_transport: false,
@@ -220,7 +234,7 @@ pub(crate) fn build_git_clone_auth_config(
 }
 
 pub(crate) fn build_git_auth_config_for_keys(keys: &Keys) -> Result<GitAuthConfig, String> {
-    let git_path = resolve_command("git").ok_or_else(|| "git was not found on PATH".to_string())?;
+    let git_path = resolve_git_binary()?;
     let credential_helper = resolve_command("git-credential-nostr");
     let nsec = keys
         .secret_key()
