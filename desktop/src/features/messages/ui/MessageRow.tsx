@@ -49,6 +49,7 @@ import { editMessage } from "@/shared/api/tauri";
 import { hasLinkPreviewSuppression } from "@/features/messages/lib/formatTimelineMessages";
 import { toast } from "sonner";
 import { MessageAgentOwner } from "./MessageAgentOwner";
+import { provenanceSegmentNode } from "./MessageProvenanceBadge";
 import {
   MessageAuthorText,
   MessageHeaderRow,
@@ -663,6 +664,10 @@ export const MessageRow = React.memo(
         <MessageMetaSegments
           segments={[
             { key: "owner", node: agentOwnerNode },
+            {
+              key: "provenance",
+              node: provenanceSegmentNode(message.tags, message.author),
+            },
             { key: "timestamp", node: inlineMetadataNode },
             { key: "persona", node: personaNode },
           ]}
